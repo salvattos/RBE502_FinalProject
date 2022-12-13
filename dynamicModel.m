@@ -39,7 +39,7 @@ tf = 15;
 
 counter = 1;
 for t = 0:.1:5
-    trajPoint = calcTraj(t0,tfP01,t,P0,P1)
+    trajPoint = calcTraj(t0,tfP01,t,P0,P3);
     xLog(:,counter) = trajPoint(:,1);
     yLog(:,counter) = trajPoint(:,2);
     zLog(:,counter) = trajPoint(:,3);
@@ -47,9 +47,11 @@ for t = 0:.1:5
 end
 
 
-plot4(0:.1:5,zLog.',{'Z Pos','Z Vel','Z Accel'})
+plot4(0:.1:5,xLog.',{'X Pos','X Vel','X Accel'})
+figure;
+plot3(xLog,yLog,zLog)
+grid on
 
-trajP01 = calcTraj(t0,tfP01,5,P0,P1)
 
 function ret = calcTraj(t0,tf,currT,P0,PF)
     Amat = [1 t0 t0^2 t0^3 t0^4 t0^5;
