@@ -54,13 +54,13 @@ end
 % grid on
 
 %% Simulation
-n = 12;
+n = 1;
 
 A = zeros(2*n);
 B = zeros(2*n,n);
 A(1:n,n+1:end) = eye(n);
 B(n+1:end,:) = eye(n);
-lambdaVals = [-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-4,-4,-4,-4,-4,-4,-4,-4,-4,-4,-4,-4];
+lambdaVals = [-3,-4];
 
 K = place(A,B,lambdaVals);
 
@@ -74,52 +74,50 @@ y0 = [P0.',0,0,0,0,0,0,0,0,0];
 
 [t,y] = ode45(@(t,x) odeFunc(t,x,K,P,rho,P0,P1,5),T,y0);
 
+plot4(t,[y(:,3),y(:,9)],{'Z Pos','Z Vel'})
+
 function dX = odeFunc(t,X,K,P,rho,P0,PF,runTime)
 % Constants
 m = .027;L=.046;Ix=16.571710E-6;Iy=16.571710E-6;Iz=29.261652E-6; %L & m might need to be converted back to mm/g as given
 Ip=12.65625E-8;Kf=1.28192E-8;Km=5.964552E-3;Wmax=2618;Wmin=0;t0=0;g=9.82;
 dX = zeros(12,1);
 X =  num2cell(X);
-U = [1;1;1;1];
+U = zeros(4,1);
 
 [x, y, z, phi, theta, psi, xDot, yDot, zDot, phiDot, thetaDot, psiDot] = deal(X{:});
 
 
-n=12;
+n=1;
 kp = 1;
 kd = 1;
 
 desiredPts = zeros(3,n);
 desiredPts(1:3,1:3) = calcTraj(t0,runTime,t,P0,PF);
+
+B = zeros(2*n,n);
+B(n+1:end,:) = eye(n);
+
+boundary = .10;
+
+eZ = [z-desiredPts(1,3);zDot-desiredPts(2,3)];
+
+Vz = calcV(desiredPts(3,1),rho,K,eZ,P,B,boundary);
+
+U(1) = (m/(cos(phi)*cos(theta)))*Vz + ((m*g)/(cos(phi)*cos(theta)));
+
+
 Fx = m*(-kp*(x-desiredPts(1,1)) - kd*(xDot-desiredPts(1,2)) + desiredPts(1,3));
 Fy = m*(-kp*(y-desiredPts(2,1)) - kd*(yDot-desiredPts(2,2)) + desiredPts(2,3));
 
 thetaDesired = asin(Fx/U(1));
 phiDesired = asin(Fy/U(1));
+psiDesired = 0;
 
 %Update desired points
-desiredPts(1,4:5) = [phiDesired,thetaDesired];
-
-
-
-B = zeros(2*n,n);
-B(n+1:end,:) = eye(n);
-
-phi = .10;
-
-e = zeros(2*n,1);
-
-if norm(e.'*P*B) > phi
-    Vr = -rho*(e.'*P*B)/(norm(e.'*P*B));
-else
-    Vr = -rho*(e.'*P*B)/(phi);
-end
-
-V = desiredPts(3,:).' - K*e + Vr.';
-
-
-Tau = 1;
-U(:,:) = 0;
+desiredPts(1,4:6) = [phiDesired,thetaDesired,psiDesired];
+ePsi = [phi-desiredPts(1,6);phiDot-desiredPts(2,6)];
+Vpsi = calcV(desiredPts(3,6),rho,K,ePsi,P,B,boundary);
+U(4) = Iz*Vpsi - Iz*phiDot*thetaDot*((Ix-Iy)/Iz);
 
 
 % Allocation Matrix
@@ -151,6 +149,17 @@ dX(7:12) = Xdd;
 
 end
 
+function ret = calcV(desiredA,rho,K,e,P,B,boundary)
+
+    if norm(e.'*P*B) > boundary
+        Vr = -rho*(e.'*P*B)/(norm(e.'*P*B));
+    else
+        Vr = -rho*(e.'*P*B)/(boundary);
+    end
+    
+    ret = desiredA - K*e + Vr.';
+
+end
 
 function ret = calcTraj(t0,tf,currT,P0,PF)
     Amat = [1 t0 t0^2 t0^3 t0^4 t0^5;
