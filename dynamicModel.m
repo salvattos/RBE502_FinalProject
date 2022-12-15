@@ -30,13 +30,13 @@ global U;
 U = [0;0;0;0]
 
 T = [0, 10];
-y0 = [P1.',0,0,0,0,0,0,0,0,0];
+y0 = [P4.',0,0,0,0,0,0,0,0,0];
 
-[t,y] = ode45(@(t,x) odeFunc(t,x,P1,P2,T(2)),T,y0);
+[t,y] = ode45(@(t,x) odeFunc(t,x,P4,P5,T(2)),T,y0);
 %[t2,w] = ode45(@(t,x) odeFunc(t,x,P1,P2,T(2)),T,y(end,:));
 
 
-plot4(t,[y(:,3),y(:,9)],{'Z Pos','Z Vel'})
+plot4(t,[y(:,1),y(:,2),y(:,3),y(:,9)],{'X Pos','Y Pos','Z Pos','Z Vel'})
 
 
 
@@ -52,10 +52,10 @@ global U;
 
 % Set Gains
 kp = 100;
-kd = 5;
+kd = 10;
 K = [10;140;140;25];
 lambda = [5;13;13;5];
-boundary = [.01;.1;.1;.1];
+boundary = [.1;.1;.1;.1];
 
 desiredPts = zeros(3,6);
 desiredPts(1:3,1:3) = calcTraj(t0,runTime,t,P0,PF); 
@@ -107,7 +107,7 @@ U(3) = Iy*desiredPts(3,5) - phiDot*psiDot*(Iz-Ix) - Ip*Omega*phiDot+ Iy*lambda(3
 
 
 %Psi control law
-ePsi = [psi-desiredPts(1,6);psiDot-desiredPts(2,6)];
+ePsi = [desiredPts(1,6)-psi;desiredPts(2,6)-psiDot];
 sPsi = ePsi(2) + lambda(4)*ePsi(1); 
 satPsi = sat(sPsi,boundary(4));
 UrPsi = K(4) * satPsi;
