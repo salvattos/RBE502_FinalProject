@@ -20,9 +20,9 @@ for t = t0:.1:tf
 end
 
 
-% plot4(t0:.1:tf,yLog.',{'X Pos','X Vel','X Accel'})
+% plot4(t0:.1:tf,xLog.',{'X Pos','X Vel','X Accel'})
 % figure;
-% plot3(xLog(1,:).',yLog(1,:).',zLog(1,:).')
+% plot3([1,0,1],[1 0 1],[1 0 1])
 % grid on
 
 %% Simulation
@@ -30,9 +30,9 @@ global U;
 U = [0;0;0;0]
 
 T = [0, 10];
-y0 = [P1.',0,0,0,0,0,0,0,0,0];
+y0 = [P0.',0,0,0,0,0,0,0,0,0];
 
-[t,y] = ode45(@(t,x) odeFunc(t,x,P1,P2,T(2)),T,y0);
+[t,y] = ode45(@(t,x) odeFunc(t,x,P0,P1,T(2)),T,y0);
 %[t2,w] = ode45(@(t,x) odeFunc(t,x,P1,P2,T(2)),T,y(end,:));
 
 
@@ -55,11 +55,12 @@ kp = 100;
 kd = 5;
 K = [10;140;140;25];
 lambda = [5;13;13;5];
-boundary = [.01;.1;.1;.1];
+boundary = [.01;1;1;1];
 
 desiredPts = zeros(3,6);
 desiredPts(1:3,1:3) = calcTraj(t0,runTime,t,P0,PF); 
 
+syms w1 w2 w3 w4
 % Calculate Omega based off of previous U input
 % Allocation Matrix
 allocMat = [1/(4*Kf*L), -sqrt(2)/(4*Kf*L), -sqrt(2)/(4*Kf*L), -1/(4*Km*Kf);
@@ -67,12 +68,10 @@ allocMat = [1/(4*Kf*L), -sqrt(2)/(4*Kf*L), -sqrt(2)/(4*Kf*L), -1/(4*Km*Kf);
             1/(4*Kf*L), sqrt(2)/(4*Kf*L), sqrt(2)/(4*Kf*L), -1/(4*Km*Kf);
             1/(4*Kf*L), sqrt(2)/(4*Kf*L), -sqrt(2)/(4*Kf*L), 1/(4*Km*Kf)];
 
-Wdesired = allocMat*U;
+Wdesired = allocMat*U
 Omega = Wdesired(1) - Wdesired(2) + Wdesired(3) - Wdesired(4);
+Omega
 
-if(Omega ~= 0)
-    str = 'not zero!'
-end
 % Z Control Law
 eZ = [desiredPts(1,3)-z;desiredPts(2,3)-zDot]; %might need to switch
 sZ = eZ(2) + lambda(1)*eZ(1); 
@@ -121,7 +120,7 @@ Xdd = [(1/m)*(cos(phi)*sin(theta)*cos(psi) + sin(phi)*sin(psi))*U(1);
         thetaDot*psiDot*((Iy-Iz)/Ix) - (Ip/Ix)*Omega*thetaDot + (1/Ix)*U(2);
         phiDot*psiDot*((Iz-Ix)/Iy) + (Ip/Iy)*Omega*phiDot + (1/Iy)*U(3);
         phiDot*thetaDot*((Ix-Iy)/Iz) + (1/Iz)*U(4)];
-U;
+U
 dX(1) = xDot;
 dX(2) = yDot;
 dX(3) = zDot;
