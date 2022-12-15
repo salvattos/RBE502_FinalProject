@@ -1,33 +1,5 @@
 %% RBE502 Final Project
 %% Trajectory Generation
-% Constants
-m = .027;L=.046;Ix=16.571710E-6;Iy=16.571710E-6;Iz=29.261652E-6; %L & m might need to be converted back to mm/g as given
-Ip=12.65625E-8;Kf=1.28192E-8;Km=5.964552E-3;Wmax=2618;Wmin=0;
-
-% Dynamic Model 
-syms x xDot y yDot z zDot phi phiDot theta thetaDot psi psiDot u1 u2 u3 u4 g
-X = [x; y; z; phi; theta; psi; xDot; yDot; zDot; phiDot; thetaDot; psiDot];
-U = [u1;u2;u3;u4];
-
-
-% Allocation Matrix
-allocMat = [1/(4*Kf*L), -sqrt(2)/(4*Kf*L), -sqrt(2)/(4*Kf*L), -1/(4*Km*Kf);
-            1/(4*Kf*L), -sqrt(2)/(4*Kf*L), sqrt(2)/(4*Kf*L), 1/(4*Km*Kf);
-            1/(4*Kf*L), sqrt(2)/(4*Kf*L), sqrt(2)/(4*Kf*L), -1/(4*Km*Kf);
-            1/(4*Kf*L), sqrt(2)/(4*Kf*L), -sqrt(2)/(4*Kf*L), 1/(4*Km*Kf)];
-
-Wdesired = sqrt(allocMat*U);
-
-Omega = Wdesired(1) - Wdesired(2) + Wdesired(3) - Wdesired(4);
-
-% Acclerations
-Xdd = [(1/m)*(cos(phi)*sin(theta)*cos(psi) + sin(phi)*sin(psi))*U(1);
-        (1/m)*(cos(phi)*sin(theta)*cos(psi) - sin(phi)*sin(psi))*U(1);
-        (1/m)*(cos(phi)*cos(theta))*U(1) - g;
-        thetaDot*psiDot*((Iy-Iz)/Ix) - (Ip/Ix)*Omega*thetaDot + (1/Ix)*U(2);
-        phiDot*psiDot*((Iz-Ix)/Iy) + (Ip/Iy)*Omega*phiDot + (1/Iy)*U(3);
-        phiDot*thetaDot*((Ix-Iy)/Iz) + (1/Iz)*U(4)];
-
 %Quintic Trajectory Generation
 %Points
 P0=[0;0;0];P1=[0;0;1];P2=[1;0;1];
@@ -40,7 +12,7 @@ tf = 15;
 
 counter = 1;
 for t = 0:.1:5
-    trajPoint = calcTraj(t0,tfP01,t,P0,P3);
+    trajPoint = calcTraj(t0,tfP01,t,P1,P2);
     xLog(:,counter) = trajPoint(:,1);
     yLog(:,counter) = trajPoint(:,2);
     zLog(:,counter) = trajPoint(:,3);
@@ -50,76 +22,43 @@ end
 
 % plot4(0:.1:5,xLog.',{'X Pos','X Vel','X Accel'})
 % figure;
-% plot3(xLog,yLog,zLog)
+% plot3([1,0,1],[1 0 1],[1 0 1])
 % grid on
 
 %% Simulation
-n = 1;
-
-A = zeros(2*n);
-B = zeros(2*n,n);
-A(1:n,n+1:end) = eye(n);
-B(n+1:end,:) = eye(n);
-lambdaVals = [-3,-4];
-
-K = place(A,B,lambdaVals);
-
-Acl = A-B*K;
-Q = eye(2*n).*1;
-P = lyap(Acl',Q);
-rho = 10;
+global U;
+U = [0;0;0;0]
 
 T = [0, 5];
 y0 = [P0.',0,0,0,0,0,0,0,0,0];
 
-[t,y] = ode45(@(t,x) odeFunc(t,x,K,P,rho,P0,P1,5),T,y0);
+[t,y] = ode45(@(t,x) odeFunc(t,x,P0,P1,T(2)),T,y0);
 
 plot4(t,[y(:,3),y(:,9)],{'Z Pos','Z Vel'})
 
-function dX = odeFunc(t,X,K,P,rho,P0,PF,runTime)
+
+
+function dX = odeFunc(t,X,P0,PF,runTime)
 % Constants
 m = .027;L=.046;Ix=16.571710E-6;Iy=16.571710E-6;Iz=29.261652E-6; %L & m might need to be converted back to mm/g as given
-Ip=12.65625E-8;Kf=1.28192E-8;Km=5.964552E-3;Wmax=2618;Wmin=0;t0=0;g=9.82;
+Ip=12.65625E-8;Kf=1.28192E-8;Km=5.964552E-3;Wmax=2618;Wmin=0;t0=0;g=9.81;
 dX = zeros(12,1);
 X =  num2cell(X);
-U = zeros(4,1);
+global U;
+boundary = .1;
 
 [x, y, z, phi, theta, psi, xDot, yDot, zDot, phiDot, thetaDot, psiDot] = deal(X{:});
 
+% Set Gains
+kp = 100;
+kd = 5;
+K = [10;140;140;25];
+lambda = [5;13;13;5];
 
-n=1;
-kp = 1;
-kd = 1;
+desiredPts = zeros(3,6);
+desiredPts(1:3,1:3) = calcTraj(t0,runTime,t,P0,PF); 
 
-desiredPts = zeros(3,n);
-desiredPts(1:3,1:3) = calcTraj(t0,runTime,t,P0,PF);
-
-B = zeros(2*n,n);
-B(n+1:end,:) = eye(n);
-
-boundary = .10;
-
-eZ = [z-desiredPts(1,3);zDot-desiredPts(2,3)];
-
-Vz = calcV(desiredPts(3,1),rho,K,eZ,P,B,boundary);
-
-U(1) = (m/(cos(phi)*cos(theta)))*Vz + ((m*g)/(cos(phi)*cos(theta)));
-
-
-Fx = m*(-kp*(x-desiredPts(1,1)) - kd*(xDot-desiredPts(1,2)) + desiredPts(1,3));
-Fy = m*(-kp*(y-desiredPts(2,1)) - kd*(yDot-desiredPts(2,2)) + desiredPts(2,3));
-
-thetaDesired = asin(Fx/U(1));
-phiDesired = asin(Fy/U(1));
-psiDesired = 0;
-
-%Update desired points
-desiredPts(1,4:6) = [phiDesired,thetaDesired,psiDesired];
-ePsi = [phi-desiredPts(1,6);phiDot-desiredPts(2,6)];
-Vpsi = calcV(desiredPts(3,6),rho,K,ePsi,P,B,boundary);
-U(4) = Iz*Vpsi - Iz*phiDot*thetaDot*((Ix-Iy)/Iz);
-
-
+% Calculate Omega based off of previous U input
 % Allocation Matrix
 allocMat = [1/(4*Kf*L), -sqrt(2)/(4*Kf*L), -sqrt(2)/(4*Kf*L), -1/(4*Km*Kf);
             1/(4*Kf*L), -sqrt(2)/(4*Kf*L), sqrt(2)/(4*Kf*L), 1/(4*Km*Kf);
@@ -127,8 +66,48 @@ allocMat = [1/(4*Kf*L), -sqrt(2)/(4*Kf*L), -sqrt(2)/(4*Kf*L), -1/(4*Km*Kf);
             1/(4*Kf*L), sqrt(2)/(4*Kf*L), -sqrt(2)/(4*Kf*L), 1/(4*Km*Kf)];
 
 Wdesired = sqrt(allocMat*U);
-
 Omega = Wdesired(1) - Wdesired(2) + Wdesired(3) - Wdesired(4);
+
+% Z Control Law
+eZ = [z-desiredPts(1,3);zDot-desiredPts(2,3)];
+sZ = eZ(2) + lambda(1)*eZ(1); 
+satZ = sat(sZ,boundary);
+UrZ = -K(1) * satZ;
+U(1) = UrZ;
+U(1) = m * (-lambda(1) * eZ(2) + desiredPts(3,3) + g - K(1) * satZ)/(cos(phi) * cos(theta));
+
+% Calculate X and Y forces
+Fx = m*(-kp*(x-desiredPts(1,1)) - kd*(xDot-desiredPts(1,2)) + desiredPts(1,3));
+Fy = m*(-kp*(y-desiredPts(2,1)) - kd*(yDot-desiredPts(2,2)) + desiredPts(2,3));
+
+%Update desired points
+thetaDesired = asin(Fx/U(1));
+phiDesired = asin(Fy/U(1));
+psiDesired = 0;
+desiredPts(1,4:6) = [phiDesired,thetaDesired,psiDesired];
+
+%Phi control law
+ePhi = [phi-desiredPts(1,4);phi-desiredPts(2,4)];
+sPhi = ePhi(2) + lambda(2)*ePhi(1); 
+satPhi = sat(sPhi,boundary);
+UrPhi = -K(2) * satPhi;
+U(2) = Ix*UrPhi - (lambda(2)*phiDot*Ix) - (Ip*Omega*thetaDot) - (thetaDot*psiDot*(Iy - Iz));  
+
+
+%Theta control law
+eTheta = [theta-desiredPts(1,5);theta-desiredPts(2,5)];
+sTheta = eTheta(2) + lambda(3)*eTheta(1); 
+satTheta = sat(sTheta,boundary);
+UrTheta = -K(3) * satTheta;
+U(3) = UrTheta*Iy - (lambda(3)*thetaDot*Iy) - (Ip*Omega*phiDot) - (phiDot * psiDot * (Iz - Ix)); 
+
+
+%Psi control law
+ePsi = [psi-desiredPts(1,6);psi-desiredPts(2,6)];
+sPsi = ePsi(2) + lambda(4)*ePsi(1); 
+satPsi = sat(sPsi,boundary);
+UrPsi = -K(4) * satPsi;
+U(4) = -Iz * (UrPsi + lambda(4)*ePsi(2));
 
 
 % Acclerations
@@ -138,7 +117,7 @@ Xdd = [(1/m)*(cos(phi)*sin(theta)*cos(psi) + sin(phi)*sin(psi))*U(1);
         thetaDot*psiDot*((Iy-Iz)/Ix) - (Ip/Ix)*Omega*thetaDot + (1/Ix)*U(2);
         phiDot*psiDot*((Iz-Ix)/Iy) + (Ip/Iy)*Omega*phiDot + (1/Iy)*U(3);
         phiDot*thetaDot*((Ix-Iy)/Iz) + (1/Iz)*U(4)];
-
+U
 dX(1) = xDot;
 dX(2) = yDot;
 dX(3) = zDot;
@@ -149,16 +128,8 @@ dX(7:12) = Xdd;
 
 end
 
-function ret = calcV(desiredA,rho,K,e,P,B,boundary)
-
-    if norm(e.'*P*B) > boundary
-        Vr = -rho*(e.'*P*B)/(norm(e.'*P*B));
-    else
-        Vr = -rho*(e.'*P*B)/(boundary);
-    end
-    
-    ret = desiredA - K*e + Vr.';
-
+function ret = sat(s,boundary)
+    ret = min(max(s/boundary,-1),1);
 end
 
 function ret = calcTraj(t0,tf,currT,P0,PF)
