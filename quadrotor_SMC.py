@@ -68,8 +68,8 @@ class Quadrotor():
         #Set Gains
         kp = 100
         kd = 10
-        K = np.array([5,140,140,25])
-        Lam = np.array([2,13,13,5])
+        K = np.array([10,140,140,25])
+        Lam = np.array([5,13,13,5])
         boundary = np.array([.1,.1,.1,.1])
 
         # obtain the desired values by evaluating the corresponding trajectories
@@ -99,29 +99,55 @@ class Quadrotor():
         #Z Control Law
         eZ = np.array([[desiredPts[0,z]-xyz[z]],
                         [desiredPts[1,z]-xyz_dot[z]]])
-        #print(desiredPts)
-        #print(eZ[1][0])
         sZ = eZ[1][0] + Lam[0]*eZ[0][0] 
         satZ = self.sat(sZ,boundary[0])
         UrZ = K[0] * satZ
-        self.U[0] = (m/(np.cos(phi)*np.cos(theta)))*(desiredPts[2,z]+g+Lam[0]*eZ[1][0] + UrZ)
+        self.U[0] = (m/(np.cos(rpy[phi])*np.cos(rpy[theta])))*(desiredPts[2,z]+g+Lam[0]*eZ[1][0] + UrZ)
 
 
         #Calculate X and Y forces
-        Fx = m*(-kp*(xyz[x]-desiredPts[0,0]) - kd*(xyz_dot[x]-desiredPts[1,1]) + desiredPts[2,1])
-        Fy = m*(-kp*(xyz[y]-desiredPts[0,1]) - kd*(xyz_dot[y]-desiredPts[1,2]) + desiredPts[2,2])
-        print(self.U[0])
+        Fx = m*(-kp*(xyz[x]-desiredPts[0,0]) - kd*(xyz_dot[x]-desiredPts[1,0]) + desiredPts[2,0])
+        Fy = m*(-kp*(xyz[y]-desiredPts[0,1]) - kd*(xyz_dot[y]-desiredPts[1,1]) + desiredPts[2,1])
+        #print(self.U[0])
 
         #Update desired points
+        #if(self.U[0] == 0): self.U[0] = .00001
+        #print(-Fy/self.U[0])
         thetaDesired = np.arcsin(Fx/self.U[0])
         phiDesired = np.arcsin(-Fy/self.U[0])
         psiDesired = 0
-        print(desiredPts[0,3:6])
+        #print(desiredPts[0,3:6])
         desiredPts[0,3:6] = [phiDesired,thetaDesired,psiDesired]
-        print(desiredPts[0,3:6])
+        #print(desiredPts[0,3:6])
         # TODO: implement the Sliding Mode Control laws designed in Part 2 to calculate the control inputs "u"
         # REMARK: wrap the roll-pitch-yaw angle errors to [-pi to pi]
         # TODO: convert the desired control inputs "u" to desired rotor velocities "motor_vel" by using the "allocation matrix"
+
+
+        #Phi control law
+        ePhi = np.array([[desiredPts[0,3]-rpy[phi]],[desiredPts[1,3]-rpy_dot[phi]]])
+        sPhi = ePhi[1][0] + Lam[1]*ePhi[0][0]  
+        satPhi = self.sat(sPhi,boundary[1])
+        UrPhi = (K[1] + (Ip/Ix)*Omega)*satPhi 
+        self.U[1] = Ix*desiredPts[2,3] - rpy[theta]*rpy[psi]*(Iy-Iz) + Ip*Omega*rpy[theta] + Ix*Lam[1]*ePhi[1][0] + Ix*UrPhi
+
+
+        #Theta control law
+        eTheta = [[desiredPts[0,4]-rpy[theta]],[desiredPts[1,4]-rpy_dot[theta]]]
+        sTheta = eTheta[1][0] + Lam[2]*eTheta[0][0]
+        satTheta = self.sat(sTheta,boundary[2])
+        UrTheta = (K[2]+(Ip/Iy)*Omega)*satTheta
+        self.U[2] = Iy*desiredPts[2,4] - rpy_dot[phi]*rpy_dot[psi]*(Iz-Ix) - Ip*Omega*rpy_dot[phi]+ Iy*Lam[3]*eTheta[1][0] + Iy*UrTheta;
+
+        #Psi control law
+        ePsi = np.array([[desiredPts[0,5]-rpy[psi]],[desiredPts[1,5]-rpy_dot[psi]]])
+        sPsi = ePsi[1][0] + Lam[3]*ePsi[0][0]
+        satPsi = self.sat(sPsi,boundary[3])
+        UrPsi = K[3] * satPsi
+        self.U[3] = Iz*desiredPts[2,5] - rpy_dot[phi]*rpy_dot[psi]*(Ix-Iy) + Iz*Lam[3]*ePsi[1][0] + Iz*UrPsi
+        
+        
+
 
         # publish the motor velocities to the associated ROS topic
         motor_speed = Actuators()
