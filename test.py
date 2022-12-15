@@ -28,6 +28,6 @@ def traj_evaluate(t0,tf,currT,P0,PF):
 P0 = np.array([0,0,0])
 P1 = np.array([0,0,1])
 
-traj = traj_evaluate(0,5,5,P0,P1)
+traj = traj_evaluate(0,10,5,P0,P1)
 
 print(traj)
