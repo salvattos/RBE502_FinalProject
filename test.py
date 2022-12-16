@@ -25,10 +25,10 @@ def traj_evaluate(t0,tf,currT,P0,PF):
         return traj
 
 
-P0 = np.array([0,0,0])
-P1 = np.array([0,0,1])
+P0 = np.array([0,0,1])
+P1 = np.array([1,0,1])
 
 traj = traj_evaluate(0,10,5,P0,P1)
-print(traj[1,6])
+
 
 print(traj)
