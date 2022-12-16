@@ -57,20 +57,25 @@ class Quadrotor():
     def sat(self,s,boundary):
         return min(max(s/boundary,-1),1)
 
+    def normalize(self, array, upperBound):
+        if np.ptp(array) != 0:
+            norm = (upperBound*(array - np.min(array))/np.ptp(array))
+            return norm
+        else: return array
 
     def smc_control(self, xyz, xyz_dot, rpy, rpy_dot):
         #Known Variables
-        m,L,Ix,Iy,Iz = .027, .046, 16.571710E-6, 16.571710E-6, 29.261652E-6
-        Ip,Kf,Km,Wmax,Wmin,g = 12.65625E-8, 1.28192E-8, 5.964552E-3, 2618, 0, 9.81
+        m,L,Ix,Iy,Iz = .027, .046, 16.571710e-6, 16.571710e-6, 29.261652e-6
+        Ip,Kf,Km,Wmax,Wmin,g = 12.65625e-8, 1.28192e-8, 5.964552e-3, 2618, 0, 9.81
         x,y,z = 0,1,2
         phi,theta,psi = 0,1,2
 
         #Set Gains
         kp = 100
         kd = 10
-        K = np.array([10,140,140,25])
-        Lam = np.array([5,13,13,5])
-        boundary = np.array([.1,.1,.1,.1])
+        K = np.array([50,140,140,25])
+        Lam = np.array([10,13,13,5])
+        boundary = np.array([.0001,.0001,.0001,.0001])
 
         # obtain the desired values by evaluating the corresponding trajectories
         P0 = np.array([0,0,0])
@@ -86,15 +91,22 @@ class Quadrotor():
 
         #Calculate Omega based off of previous U input
         #Allocation Matrix
-        allocMat = np.array([[1/(4*Kf*L), -sqrt(2)/(4*Kf*L), -sqrt(2)/(4*Kf*L), -1/(4*Km*Kf)],
-                    [1/(4*Kf*L), -sqrt(2)/(4*Kf*L), sqrt(2)/(4*Kf*L), 1/(4*Km*Kf)],
-                    [1/(4*Kf*L), sqrt(2)/(4*Kf*L), sqrt(2)/(4*Kf*L), -1/(4*Km*Kf)],
-                    [1/(4*Kf*L), sqrt(2)/(4*Kf*L), -sqrt(2)/(4*Kf*L), 1/(4*Km*Kf)]])
+        allocMat = np.array([[1/(4*Kf), -sqrt(2)/(4*Kf*L), -sqrt(2)/(4*Kf*L), -1/(4*Km*Kf)],
+                            [1/(4*Kf), -sqrt(2)/(4*Kf*L), sqrt(2)/(4*Kf*L), 1/(4*Km*Kf)],
+                            [1/(4*Kf), sqrt(2)/(4*Kf*L), sqrt(2)/(4*Kf*L), -1/(4*Km*Kf)],
+                            [1/(4*Kf), sqrt(2)/(4*Kf*L), -sqrt(2)/(4*Kf*L), 1/(4*Km*Kf)]])
 
         # TODO: maintain the rotor velocities within the valid range of [0 to 2618]
+        ## This is all messed up you might wanna go w the previous version
         Wdesired = np.matmul(allocMat,self.U)
-        Wdesired = np.clip(Wdesired,Wmin,Wmax)
+        Wdesired = self.normalize(Wdesired,Wmax**2)
+        Wdesired = np.sqrt(Wdesired)
         Omega = Wdesired[0] - Wdesired[1] + Wdesired[2] - Wdesired[3]
+
+        # OLD
+        #Wdesired = np.clip(np.matmul(allocMat,self.U),Wmin**2,Wmax**2)
+        #Wdesired = np.sqrt(Wdesired)
+        #Omega = Wdesired[0] - Wdesired[1] + Wdesired[2] - Wdesired[3]
 
         #Z Control Law
         eZ = np.array([[desiredPts[0,z]-xyz[z]],
@@ -123,37 +135,40 @@ class Quadrotor():
         # REMARK: wrap the roll-pitch-yaw angle errors to [-pi to pi]
         # TODO: convert the desired control inputs "u" to desired rotor velocities "motor_vel" by using the "allocation matrix"
 
-
         #Phi control law
         ePhi = np.array([[desiredPts[0,3]-rpy[phi]],[desiredPts[1,3]-rpy_dot[phi]]])
+        #Bound the Errors between -pi and pi
+        ePhi = np.clip(ePhi,-pi,pi)
         sPhi = ePhi[1][0] + Lam[1]*ePhi[0][0]  
         satPhi = self.sat(sPhi,boundary[1])
         UrPhi = (K[1] + (Ip/Ix)*Omega)*satPhi 
-        self.U[1] = Ix*desiredPts[2,3] - rpy[theta]*rpy[psi]*(Iy-Iz) + Ip*Omega*rpy[theta] + Ix*Lam[1]*ePhi[1][0] + Ix*UrPhi
+        self.U[1] = Ix*desiredPts[2,3] - rpy_dot[theta]*rpy_dot[psi]*(Iy-Iz) + Ip*Omega*rpy_dot[theta] + Ix*Lam[1]*ePhi[1][0] + Ix*UrPhi
 
 
         #Theta control law
         eTheta = [[desiredPts[0,4]-rpy[theta]],[desiredPts[1,4]-rpy_dot[theta]]]
+        #Bound the Errors between -pi and pi
+        eTheta = np.clip(eTheta,-pi,pi)
         sTheta = eTheta[1][0] + Lam[2]*eTheta[0][0]
         satTheta = self.sat(sTheta,boundary[2])
         UrTheta = (K[2]+(Ip/Iy)*Omega)*satTheta
-        self.U[2] = Iy*desiredPts[2,4] - rpy_dot[phi]*rpy_dot[psi]*(Iz-Ix) - Ip*Omega*rpy_dot[phi]+ Iy*Lam[3]*eTheta[1][0] + Iy*UrTheta;
+        self.U[2] = Iy*desiredPts[2,4] - rpy_dot[phi]*rpy_dot[psi]*(Iz-Ix) - Ip*Omega*rpy_dot[phi]+ Iy*Lam[3]*eTheta[1][0] + Iy*UrTheta
 
         #Psi control law
         ePsi = np.array([[desiredPts[0,5]-rpy[psi]],[desiredPts[1,5]-rpy_dot[psi]]])
+        #Bound the Errors between -pi and pi
+        ePsi = np.clip(ePsi,-pi,pi)
         sPsi = ePsi[1][0] + Lam[3]*ePsi[0][0]
         satPsi = self.sat(sPsi,boundary[3])
         UrPsi = K[3] * satPsi
         self.U[3] = Iz*desiredPts[2,5] - rpy_dot[phi]*rpy_dot[psi]*(Ix-Iy) + Iz*Lam[3]*ePsi[1][0] + Iz*UrPsi
         
-        
-
 
         # publish the motor velocities to the associated ROS topic
         motor_speed = Actuators()
         motor_speed.angular_velocities = [Wdesired[0], Wdesired[1], Wdesired[2], Wdesired[3]]
 
-        rospy.loginfo(self.t)
+        
         #rospy.loginfo(self.startTime)
         #rospy.loginfo(self.endTime)
         #print(xyz)

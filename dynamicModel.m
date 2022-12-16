@@ -62,12 +62,12 @@ desiredPts(1:3,1:3) = calcTraj(t0,runTime,t,P0,PF);
 
 % Calculate Omega based off of previous U input
 % Allocation Matrix
-allocMat = [1/(4*Kf*L), -sqrt(2)/(4*Kf*L), -sqrt(2)/(4*Kf*L), -1/(4*Km*Kf);
-            1/(4*Kf*L), -sqrt(2)/(4*Kf*L), sqrt(2)/(4*Kf*L), 1/(4*Km*Kf);
-            1/(4*Kf*L), sqrt(2)/(4*Kf*L), sqrt(2)/(4*Kf*L), -1/(4*Km*Kf);
-            1/(4*Kf*L), sqrt(2)/(4*Kf*L), -sqrt(2)/(4*Kf*L), 1/(4*Km*Kf)];
+allocMat = [1/(4*Kf), -sqrt(2)/(4*Kf*L), -sqrt(2)/(4*Kf*L), -1/(4*Km*Kf);
+            1/(4*Kf), -sqrt(2)/(4*Kf*L), sqrt(2)/(4*Kf*L), 1/(4*Km*Kf);
+            1/(4*Kf), sqrt(2)/(4*Kf*L), sqrt(2)/(4*Kf*L), -1/(4*Km*Kf);
+            1/(4*Kf), sqrt(2)/(4*Kf*L), -sqrt(2)/(4*Kf*L), 1/(4*Km*Kf)];
 
-Wdesired = allocMat*U;
+Wdesired = sqrt(allocMat*U);
 Omega = Wdesired(1) - Wdesired(2) + Wdesired(3) - Wdesired(4);
 
 if(Omega ~= 0)
