@@ -32,13 +32,12 @@ global w;
 w = [];
 w(1) = 0;
 T = [0, 10];
-y0 = [P0.',0,0,0,0,0,0,0,0,0];
+y0 = [P1.',0,0,0,0,0,0,0,0,0];
 
-[t,y] = ode45(@(t,x) odeFunc(t,x,P0,P1,T(2)),T,y0);
-%[t2,w] = ode45(@(t,x) odeFunc(t,x,P1,P2,T(2)),T,y(end,:));
+[t,y] = ode45(@(t,x) odeFunc(t,x,P1,P2,T(2)),T,y0);
 
 
-plot4(t,[y(:,1),y(:,2),y(:,3),y(:,9)],{'X Pos','Y Pos','Z Pos','Z Vel'})
+plot4(t,[y(:,1),y(:,2),y(:,3),y(:,7),y(:,8),y(:,9)],{'X Pos','Y Pos','Z Pos','x Vel', 'y Vel', 'Z Vel'})
 figure;
 w = real(w)
 plot(w)
@@ -58,7 +57,7 @@ kp = 100;
 kd = 10;
 K = [10;140;140;25];
 lambda = [5;13;13;5];
-boundary = [.1;.1;.1;.1];
+boundary = [10;1.5;1.5;1];
 
 desiredPts = zeros(3,6);
 desiredPts(1:3,1:3) = calcTraj(t0,runTime,t,P0,PF); 
@@ -70,7 +69,7 @@ allocMat = [1/(4*Kf), -sqrt(2)/(4*Kf*L), -sqrt(2)/(4*Kf*L), -1/(4*Km*Kf);
             1/(4*Kf), sqrt(2)/(4*Kf*L), sqrt(2)/(4*Kf*L), -1/(4*Km*Kf);
             1/(4*Kf), sqrt(2)/(4*Kf*L), -sqrt(2)/(4*Kf*L), 1/(4*Km*Kf)];
 
-Wdesired = sqrt(allocMat*U)
+Wdesired = allocMat*U
 Omega = Wdesired(1) - Wdesired(2) + Wdesired(3) - Wdesired(4);
 
 global w;
@@ -162,7 +161,7 @@ end
 
 function plot4(t,y,titles)
     for i = 1 : size(titles,2)
-        subplot(2,2,i)
+        subplot(3,3,i)
         plot(t,y(:,i))
         grid on
         title(titles(i) + " over Time")

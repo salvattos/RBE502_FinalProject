@@ -75,10 +75,10 @@ class Quadrotor():
 
         #Gains for when mass is .027
         #Set Gains
-        kp = 140
+        kp = 100
         kd = 10
-        K = np.array([20,100,100,20])
-        Lam = np.array([10,10,10,5])
+        K = np.array([100,100,100,20])
+        Lam = np.array([30,10,10,5])
         boundary = np.array([10,1,1,1]) ## Problem here!
 
 
@@ -86,11 +86,18 @@ class Quadrotor():
         P0 = np.array([0,0,0])
         P1 = np.array([0,0,1])
         P2 = np.array([1,0,1])
+        P3 = np.array([1,1,1])
+        P4 = np.array([0,1,1])
+        P5 = np.array([0,0,1])
 
-
+        #Determine and calculate desired XYZ points
         desiredPts = np.zeros((3,6))
         if self.t < 5: desiredPts[:,0:3] = self.traj_evaluate(0,5,self.t,P0,P1)
         elif self.t < 15: desiredPts[:,0:3] = self.traj_evaluate(5,15,self.t,P1,P2)
+        elif self.t < 25: desiredPts[:,0:3] = self.traj_evaluate(15,215,self.t,P2,P3)
+        elif self.t < 35: desiredPts[:,0:3] = self.traj_evaluate(25,315,self.t,P3,P4)
+        elif self.t < 45: desiredPts[:,0:3] = self.traj_evaluate(35,415,self.t,P4,P5)
+
 
         #Calculate Omega based off of previous U input
         #Allocation Matrix
@@ -99,14 +106,7 @@ class Quadrotor():
                             [1/(4*Kf), sqrt(2)/(4*Kf*L), sqrt(2)/(4*Kf*L), -1/(4*Km*Kf)],
                             [1/(4*Kf), sqrt(2)/(4*Kf*L), -sqrt(2)/(4*Kf*L), 1/(4*Km*Kf)]])
 
-        # TODO: maintain the rotor velocities within the valid range of [0 to 2618]
-        ## This is all messed up you might wanna go w the previous version
-        #Wdesired = np.matmul(allocMat,self.U)
-        #Wdesired = self.normalize(Wdesired,Wmax**2)
-        #Wdesired = np.sqrt(Wdesired)
-        #Omega = Wdesired[0] - Wdesired[1] + Wdesired[2] - Wdesired[3]
 
-        # OLD
         Wdesired = np.clip(np.matmul(allocMat,self.U),Wmin**2,Wmax**2)
         Wdesired = np.sqrt(Wdesired)
         Omega = Wdesired[0] - Wdesired[1] + Wdesired[2] - Wdesired[3]
@@ -123,19 +123,12 @@ class Quadrotor():
         #Calculate X and Y forces
         Fx = m*(-kp*(xyz[x]-desiredPts[0,0]) - kd*(xyz_dot[x]-desiredPts[1,0]) + desiredPts[2,0])
         Fy = m*(-kp*(xyz[y]-desiredPts[0,1]) - kd*(xyz_dot[y]-desiredPts[1,1]) + desiredPts[2,1])
-        #print(self.U[0])
 
         #Update desired points
         thetaDesired = np.arcsin(np.clip(Fx/self.U[0],-1,1))
-        #if self.timer % 100 == 0: print("Fx: ",Fx)
         phiDesired = np.arcsin(np.clip(-Fy/self.U[0],-1,1))
         psiDesired = 0
-        #print(desiredPts[0,3:6])
         desiredPts[0,3:6] = [phiDesired,thetaDesired,psiDesired]
-        #print(desiredPts[0,3:6])
-        # TODO: implement the Sliding Mode Control laws designed in Part 2 to calculate the control inputs "u"
-        # REMARK: wrap the roll-pitch-yaw angle errors to [-pi to pi]
-        # TODO: convert the desired control inputs "u" to desired rotor velocities "motor_vel" by using the "allocation matrix"
 
         #Phi control law
         ePhi = np.array([[desiredPts[0,3]-rpy[phi]],[desiredPts[1,3]-rpy_dot[phi]]])
@@ -214,7 +207,7 @@ class Quadrotor():
     # save the actual trajectory data
     def save_data(self):
         # TODO: update the path below with the correct path
-        with open("/home/salvattos/rbe502_project/src/project/scripts/log.pkl","wb") as fp:
+        with open("/home/salvattos/rbe502_project/src/log.pkl","wb") as fp:
             self.mutex_lock_on = True
             pickle.dump([self.t_series,self.x_series,self.y_series,self.z_series], fp)
 
