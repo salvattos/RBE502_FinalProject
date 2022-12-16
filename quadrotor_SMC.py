@@ -26,6 +26,7 @@ class Quadrotor():
         self.z_series = []
         self.mutex_lock_on = False
         self.inTransit = True
+        self.timer = 0
         self.U = np.zeros((4,1))
         rospy.on_shutdown(self.save_data)
         # TODO: include initialization codes if needed
@@ -71,18 +72,18 @@ class Quadrotor():
         phi,theta,psi = 0,1,2
 
         #Set Gains
-        kp = 100
+        kp = 120
         kd = 10
-        K = np.array([50,140,140,25])
+        K = np.array([20,140,140,25])
         Lam = np.array([10,13,13,5])
-        boundary = np.array([.0001,.0001,.0001,.0001])
+        boundary = np.array([5,1,1,.1]) ## Problem here!
 
         # obtain the desired values by evaluating the corresponding trajectories
         P0 = np.array([0,0,0])
-        P1 = np.array([0,0,1])
+        P1 = np.array([1,0,1])
         if(self.inTransit):
             self.inTransit = False
-            self.endTime = self.t0 + 10
+            self.endTime = self.t0 + 5
             self.startTime = self.t0
         currT = self.t + self.t0
 
@@ -98,20 +99,21 @@ class Quadrotor():
 
         # TODO: maintain the rotor velocities within the valid range of [0 to 2618]
         ## This is all messed up you might wanna go w the previous version
-        Wdesired = np.matmul(allocMat,self.U)
-        Wdesired = self.normalize(Wdesired,Wmax**2)
-        Wdesired = np.sqrt(Wdesired)
-        Omega = Wdesired[0] - Wdesired[1] + Wdesired[2] - Wdesired[3]
-
-        # OLD
-        #Wdesired = np.clip(np.matmul(allocMat,self.U),Wmin**2,Wmax**2)
+        #Wdesired = np.matmul(allocMat,self.U)
+        #Wdesired = self.normalize(Wdesired,Wmax**2)
         #Wdesired = np.sqrt(Wdesired)
         #Omega = Wdesired[0] - Wdesired[1] + Wdesired[2] - Wdesired[3]
+
+        # OLD
+        Wdesired = np.clip(np.matmul(allocMat,self.U),Wmin**2,Wmax**2)
+        Wdesired = np.sqrt(Wdesired)
+        Omega = Wdesired[0] - Wdesired[1] + Wdesired[2] - Wdesired[3]
 
         #Z Control Law
         eZ = np.array([[desiredPts[0,z]-xyz[z]],
                         [desiredPts[1,z]-xyz_dot[z]]])
         sZ = eZ[1][0] + Lam[0]*eZ[0][0] 
+        if self.timer % 100 == 0: print("SZ: ",sZ)
         satZ = self.sat(sZ,boundary[0])
         UrZ = K[0] * satZ
         self.U[0] = (m/(np.cos(rpy[phi])*np.cos(rpy[theta])))*(desiredPts[2,z]+g+Lam[0]*eZ[1][0] + UrZ)
@@ -125,8 +127,8 @@ class Quadrotor():
         #Update desired points
         #if(self.U[0] == 0): self.U[0] = .00001
         #print(-Fy/self.U[0])
-        thetaDesired = np.arcsin(Fx/self.U[0])
-        phiDesired = np.arcsin(-Fy/self.U[0])
+        thetaDesired = np.arcsin(np.clip(Fx/self.U[0],-1,1))
+        phiDesired = np.arcsin(np.clip(-Fy/self.U[0],-1,1))
         psiDesired = 0
         #print(desiredPts[0,3:6])
         desiredPts[0,3:6] = [phiDesired,thetaDesired,psiDesired]
@@ -168,10 +170,13 @@ class Quadrotor():
         motor_speed = Actuators()
         motor_speed.angular_velocities = [Wdesired[0], Wdesired[1], Wdesired[2], Wdesired[3]]
 
-        
+        self.timer = self.timer + 1
+        if self.timer % 100 == 0: print(Wdesired)#print(np.matmul(allocMat,self.U))
+        if self.t > 5: self.U[:] = np.zeros((4,1))
         #rospy.loginfo(self.startTime)
         #rospy.loginfo(self.endTime)
         #print(xyz)
+        
         self.motor_speed_pub.publish(motor_speed)
 
     # odometry callback function (DO NOT MODIFY)

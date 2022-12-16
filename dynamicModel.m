@@ -28,17 +28,20 @@ end
 %% Simulation
 global U;
 U = [0;0;0;0]
-
+global w;
+w = [];
+w(1) = 0;
 T = [0, 10];
-y0 = [P4.',0,0,0,0,0,0,0,0,0];
+y0 = [P0.',0,0,0,0,0,0,0,0,0];
 
-[t,y] = ode45(@(t,x) odeFunc(t,x,P4,P5,T(2)),T,y0);
+[t,y] = ode45(@(t,x) odeFunc(t,x,P0,P1,T(2)),T,y0);
 %[t2,w] = ode45(@(t,x) odeFunc(t,x,P1,P2,T(2)),T,y(end,:));
 
 
 plot4(t,[y(:,1),y(:,2),y(:,3),y(:,9)],{'X Pos','Y Pos','Z Pos','Z Vel'})
-
-
+figure;
+w = real(w)
+plot(w)
 
 function dX = odeFunc(t,X,P0,PF,runTime)
 % Constants
@@ -67,8 +70,11 @@ allocMat = [1/(4*Kf), -sqrt(2)/(4*Kf*L), -sqrt(2)/(4*Kf*L), -1/(4*Km*Kf);
             1/(4*Kf), sqrt(2)/(4*Kf*L), sqrt(2)/(4*Kf*L), -1/(4*Km*Kf);
             1/(4*Kf), sqrt(2)/(4*Kf*L), -sqrt(2)/(4*Kf*L), 1/(4*Km*Kf)];
 
-Wdesired = sqrt(allocMat*U);
+Wdesired = sqrt(allocMat*U)
 Omega = Wdesired(1) - Wdesired(2) + Wdesired(3) - Wdesired(4);
+
+global w;
+w(end+1) = Wdesired(1);
 
 if(Omega ~= 0)
     str = 'not zero!'
