@@ -20,10 +20,6 @@ for t = t0:.1:tf
 end
 
 
-% plot4(t0:.1:tf,yLog.',{'X Pos','X Vel','X Accel'})
-% figure;
-% plot3(xLog(1,:).',yLog(1,:).',zLog(1,:).')
-% grid on
 
 %% Simulation
 global U;
